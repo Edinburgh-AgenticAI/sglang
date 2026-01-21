@@ -69,8 +69,9 @@ class SchedulerMetricsMixin:
         self.last_prefill_stats_tic = time.perf_counter()
         self.last_input_throughput = self.last_prefill_tokens / gap_latency
         self.last_prefill_tokens = adder.log_input_tokens
-        cache_hit_rate = adder.log_hit_tokens / (
-            adder.log_input_tokens + adder.log_hit_tokens
+        total_tokens = adder.log_input_tokens + adder.log_hit_tokens
+        cache_hit_rate = (
+            adder.log_hit_tokens / total_tokens if total_tokens > 0 else 0.0
         )
         self.cache_hit_list.append(cache_hit_rate)
         self.prefill_tp_list.append(self.last_input_throughput)
