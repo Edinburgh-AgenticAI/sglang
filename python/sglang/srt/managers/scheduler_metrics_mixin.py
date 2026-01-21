@@ -9,6 +9,7 @@ from sglang.srt.managers.schedule_policy import PrefillAdder
 from sglang.srt.managers.scheduler import Req, ScheduleBatch
 from sglang.srt.metrics.collector import SchedulerMetricsCollector, SchedulerStats
 from sglang.srt.utils import get_bool_env_var
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,8 @@ class SchedulerMetricsMixin:
         self.cum_spec_accept_count = 0
         self.total_retracted_reqs = 0
         self.stats = SchedulerStats()
+        self.cache_hit_list = []
+        self.prefill_tp_list = []
         if self.enable_metrics:
             engine_type = "unified"
             labels = {
@@ -66,6 +69,11 @@ class SchedulerMetricsMixin:
         self.last_prefill_stats_tic = time.perf_counter()
         self.last_input_throughput = self.last_prefill_tokens / gap_latency
         self.last_prefill_tokens = adder.log_input_tokens
+        cache_hit_rate = adder.log_hit_tokens / (
+            adder.log_input_tokens + adder.log_hit_tokens
+        )
+        self.cache_hit_list.append(cache_hit_rate)
+        self.prefill_tp_list.append(self.last_input_throughput)
 
         if self.is_hybrid:
             (
@@ -95,6 +103,8 @@ class SchedulerMetricsMixin:
             f"#new-token: {adder.log_input_tokens}, "
             f"#cached-token: {adder.log_hit_tokens}, "
             f"{token_msg}"
+            f"Avg cache hit rate: {np.mean(self.cache_hit_list[6:]):.2f}, "
+            f"Avg input throughput (token/s): {np.mean(self.prefill_tp_list[6:]):.2f}, "
         )
 
         if self.disaggregation_mode == DisaggregationMode.PREFILL:
