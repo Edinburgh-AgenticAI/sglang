@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple, Union
+import numpy as np
 
 import psutil
 import setproctitle
@@ -216,6 +217,8 @@ class Scheduler(
                 self.dp_size,
             )
         )
+        self.cache_hit_list = []
+        self.prefill_tp_list = []
 
         # Init inter-process communication
         context = zmq.Context(2)
@@ -1121,6 +1124,12 @@ class Scheduler(
         )
 
         num_new_seq = len(can_run_list)
+        cache_hit_rate = adder.log_hit_tokens / (
+                adder.log_input_tokens + adder.log_hit_tokens
+            )
+        self.cache_hit_list.append(cache_hit_rate)
+        self.prefill_tp_list.append(self.last_input_throughput)
+
         f = (
             f"Prefill batch. "
             f"#new-seq: {num_new_seq}, "
@@ -1128,6 +1137,8 @@ class Scheduler(
             f"#cached-token: {adder.log_hit_tokens}, "
             f"token usage: {num_used / self.max_total_num_tokens:.2f}, "
             f"#running-req: {running_bs}, "
+            f"Average cache hit rate: {np.mean(self.cache_hit_list[6:]):.2f}, "
+            f"Average prefill throughput: {np.mean(self.prefill_tp_list[6:]):.2f}"
         )
 
         if self.disaggregation_mode == DisaggregationMode.PREFILL:
