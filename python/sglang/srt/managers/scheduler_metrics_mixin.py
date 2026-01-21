@@ -103,8 +103,8 @@ class SchedulerMetricsMixin:
             f"#new-token: {adder.log_input_tokens}, "
             f"#cached-token: {adder.log_hit_tokens}, "
             f"{token_msg}"
-            f"Avg cache hit rate: {np.mean(self.cache_hit_list[6:]):.2f}, "
-            f"Avg input throughput (token/s): {np.mean(self.prefill_tp_list[6:]):.2f}, "
+            f"Avg cache hit rate: {np.mean(self.cache_hit_list):.2f}, "
+            f"Avg input throughput (token/s): {np.mean(self.prefill_tp_list):.2f}, "
         )
 
         if self.disaggregation_mode == DisaggregationMode.PREFILL:
