@@ -74,7 +74,8 @@ class SchedulerMetricsMixin:
             adder.log_hit_tokens / total_tokens if total_tokens > 0 else 0.0
         )
         self.cache_hit_list.append(cache_hit_rate)
-        self.prefill_tp_list.append(self.last_input_throughput)
+        total_input_throughput = total_tokens / gap_latency
+        self.prefill_tp_list.append(total_input_throughput)
 
         if self.is_hybrid:
             (
