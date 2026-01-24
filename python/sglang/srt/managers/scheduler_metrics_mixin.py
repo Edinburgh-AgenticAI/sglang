@@ -74,8 +74,10 @@ class SchedulerMetricsMixin:
             adder.log_hit_tokens / total_tokens if total_tokens > 0 else 0.0
         )
         self.cache_hit_list.append(cache_hit_rate)
-        total_input_throughput = self.last_input_throughput * (adder.log_hit_tokens / adder.log_input_tokens + 1) if adder.log_input_tokens > 0 else 0.0
-        self.prefill_tp_list.append(total_input_throughput)
+        # Only record throughput if gap_latency is reasonable (> 1ms) to avoid outliers
+        if gap_latency > 0.001:
+            total_input_throughput = total_tokens / gap_latency
+            self.prefill_tp_list.append(total_input_throughput)
 
         if self.is_hybrid:
             (
@@ -99,6 +101,15 @@ class SchedulerMetricsMixin:
             token_msg = f"token usage: {token_usage:.2f}, "
 
         num_new_seq = len(can_run_list)
+        # Compute robust average by filtering outliers (5th-95th percentile)
+        tp_data = self.prefill_tp_list[6:] if len(self.prefill_tp_list) > 6 else self.prefill_tp_list
+        if len(tp_data) > 2:
+            p5, p95 = np.percentile(tp_data, [5, 95])
+            filtered_tp = [x for x in tp_data if p5 <= x <= p95]
+            avg_tp = np.mean(filtered_tp) if filtered_tp else np.mean(tp_data)
+        else:
+            avg_tp = np.mean(tp_data) if tp_data else 0.0
+        
         f = (
             f"Prefill batch. "
             f"#new-seq: {num_new_seq}, "
@@ -106,7 +117,7 @@ class SchedulerMetricsMixin:
             f"#cached-token: {adder.log_hit_tokens}, "
             f"{token_msg}"
             f"Avg cache hit rate: {np.mean(self.cache_hit_list):.2f}, "
-            f"Avg input throughput (token/s): {np.mean(self.prefill_tp_list[6:]):.2f}, "
+            f"Avg input throughput (token/s): {avg_tp:.2f}, "
         )
 
         if self.disaggregation_mode == DisaggregationMode.PREFILL:
