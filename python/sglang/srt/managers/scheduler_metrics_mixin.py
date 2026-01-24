@@ -101,7 +101,12 @@ class SchedulerMetricsMixin:
 
         num_new_seq = len(can_run_list)
         tp_data = self.prefill_tp_list[6:] if len(self.prefill_tp_list) > 6 else self.prefill_tp_list
-        p90_tp = np.percentile(tp_data, 90) if tp_data else 0.0
+        if tp_data:
+            p99_threshold = np.percentile(tp_data, 99)
+            filtered_tp_data = [x for x in tp_data if x <= p99_threshold]
+            avg_tp = np.mean(filtered_tp_data) if filtered_tp_data else 0.0
+        else:
+            avg_tp = 0.0
 
         f = (
             f"Prefill batch. "
@@ -110,7 +115,7 @@ class SchedulerMetricsMixin:
             f"#cached-token: {adder.log_hit_tokens}, "
             f"{token_msg}"
             f"cache hit rate: {np.mean(self.cache_hit_list):.2f}, "
-            f"input throughput (token/s): {p90_tp:.2f}, "
+            f"input throughput (token/s): {avg_tp:.2f}, "
         )
 
         if self.disaggregation_mode == DisaggregationMode.PREFILL:
