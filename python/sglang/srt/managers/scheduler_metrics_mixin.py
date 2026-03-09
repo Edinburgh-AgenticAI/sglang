@@ -93,6 +93,8 @@ class SchedulerMetricsMixin:
         self.kv_transfer_bootstrap_ms: float = 0.0
         self.kv_transfer_alloc_ms: float = 0.0
         self.kv_transfer_total_mb: float = 0.0
+        self.prefill_tp_list = []
+        self.cache_hit_rates = []
 
         self.stats = SchedulerStats()
 
@@ -165,8 +167,13 @@ class SchedulerMetricsMixin:
     ):
         gap_latency = time.perf_counter() - self.last_prefill_stats_tic
         self.last_prefill_stats_tic = time.perf_counter()
-        self.last_input_throughput = self.last_prefill_tokens / gap_latency
+        self.last_input_throughput = (self.last_prefill_tokens + prefill_stats.log_hit_tokens) / gap_latency
         self.last_prefill_tokens = prefill_stats.log_input_tokens
+        cache_hit_rate = (
+                prefill_stats.log_hit_tokens / total_tokens if total_tokens > 0 else 0.0
+            )
+        self.cache_hit_rates.append(cache_hit_rate)
+        self.prefill_tp_list.append(self.last_input_throughput)
 
         # TODO: generalize this for various memory pools
         if self.is_hybrid_swa:
@@ -225,7 +232,9 @@ class SchedulerMetricsMixin:
             msg += f"#inflight-req: {len(self.disagg_prefill_inflight_queue)}, "
             msg += f"input throughput (token/s): {self.last_input_throughput:.2f}, "
         else:
-            msg += f"input throughput (token/s): {self.last_input_throughput:.2f}, "
+            # msg += f"input throughput (token/s): {self.last_input_throughput:.2f}, "
+            msg += f"Avg cache hit rate: {sum(self.cache_hit_rates)/len(self.cache_hit_rates):.4f}, "
+            msg += f"Avg prefill throughput (token/s): {sum(self.prefill_tp_list)/len(self.prefill_tp_list):.2f}, "
 
         if self.server_args.language_only:
             msg += f"waiting-image-req: {len(self.mm_receiver.waiting_list)}, "
